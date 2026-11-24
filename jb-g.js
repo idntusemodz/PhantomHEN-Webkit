@@ -540,21 +540,18 @@ let _earlyPayload = null;
   if (SENT_HOME) return;
   let p = null;
 
-  // Fetch the payload now — networking works here, before the exploit
-  // trashes the PS4's C++ network stack. afterglow reuses this copy.
+  // Decode payload from the inline base64 bundle (payload-data.js).
+  // No network fetch needed — avoids all timing issues with remote hosting.
   try {
-    const _pu = (new URLSearchParams(location.search)).get("payload") || "phantomhen.bin";
-    mark("AG-PREFETCH", "pre-loading " + _pu + " before exploit");
-    const _pr = await fetch(_pu + (_pu.indexOf("?") < 0 ? "?" : "&") + "_=" + Date.now(),
-      { cache: "no-store", headers: { "ngrok-skip-browser-warning": "1" } });
-    if (_pr.ok) {
-      _earlyPayload = new Uint8Array(await _pr.arrayBuffer());
-      mark("AG-PREFETCH", _pu + " ready (" + _earlyPayload.length + " bytes)");
-    } else {
-      mark("AG-PREFETCH", _pu + " HTTP " + _pr.status);
+    if (typeof PHANTOM_HEN_DATA === "string" && PHANTOM_HEN_DATA.length > 0) {
+      mark("AG-PREFETCH", "decoding inline payload (" + Math.round(PHANTOM_HEN_DATA.length * 0.75 / 1024) + " KB)");
+      const _bin = atob(PHANTOM_HEN_DATA);
+      _earlyPayload = new Uint8Array(_bin.length);
+      for (var _i = 0; _i < _bin.length; _i++) _earlyPayload[_i] = _bin.charCodeAt(_i);
+      mark("AG-PREFETCH", "payload ready: " + _earlyPayload.length + " bytes");
     }
   } catch (_pe) {
-    mark("AG-PREFETCH", "fetch failed: " + (_pe && _pe.message));
+    mark("AG-PREFETCH", "inline decode failed: " + (_pe && _pe.message));
   }
 
   const opened = [];
