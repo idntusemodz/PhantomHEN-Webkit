@@ -8,7 +8,7 @@
   "use strict";
 
   const COUNTDOWN_SEC = 2;
-  const destination = new URLSearchParams("v=phantomhen306&log=1&afterglow=run&mode=phantomhen&payload=hen.bin&attempts=15&shnstop=0");
+  const destination = new URLSearchParams("v=phantomhen307&log=1&afterglow=run&mode=phantomhen&payload=phantomhen.bin&attempts=15&shnstop=0");
   /* Loader bisect params ride through from the address bar:
      ?shnprofile=minimal|debug|full, ?shnstop=2..13, ?shndisable=ftp,klog,... */
   const CARRY = ["shnprofile", "shnstop", "shnattempts", "shndelay", "shndisable", "shnload", "shnhost"];

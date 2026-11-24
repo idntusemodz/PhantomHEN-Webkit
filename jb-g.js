@@ -1,8 +1,8 @@
-﻿import { establishPrimitive } from "./core.js?v=phantomhen306";
-import { installWindowP, pairStatus } from "./mem.js?v=phantomhen306";
+﻿import { establishPrimitive } from "./core.js?v=phantomhen307";
+import { installWindowP, pairStatus } from "./mem.js?v=phantomhen307";
 import { int64 } from "./int64.js?v=1402";
 import { offsetsFor, PS4 } from "./ps4_offsets.js?v=1402";
-import * as afterglowModule from "./afterglow-g.js?v=phantomhen306";
+import * as afterglowModule from "./afterglow-g.js?v=phantomhen307";
 
 const outEl = document.getElementById("out");
 const stateEl = document.getElementById("state");
