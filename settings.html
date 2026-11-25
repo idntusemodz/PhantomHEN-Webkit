@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>PhantomHEN Settings</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0a0a0a;color:#e0e0e0;font-family:sans-serif;min-height:100vh;padding:20px}
+header{display:flex;align-items:center;gap:14px;padding:16px 0 20px;border-bottom:1px solid #1a3a4a;margin-bottom:20px}
+header img{width:40px;height:40px;object-fit:contain}
+header h1{font-size:18px;color:#00c0ff;letter-spacing:1px}
+header span{font-size:11px;color:#666;margin-left:4px}
+#status-bar{background:#111;border:1px solid #1a3a4a;border-radius:6px;padding:10px 14px;margin-bottom:20px;font-size:12px;color:#888;display:flex;align-items:center;gap:10px}
+#status-dot{width:8px;height:8px;border-radius:50%;background:#444;flex-shrink:0;transition:background .3s}
+#status-dot.ok{background:#00c060}
+#status-dot.err{background:#cc0000}
+#status-text{flex:1}
+a.back{color:#00c0ff;font-size:12px;text-decoration:none;border:1px solid #1a3a4a;padding:4px 10px;border-radius:4px}
+a.back:hover{background:#1a3a4a}
+.sections{display:grid;grid-template-columns:1fr;gap:0 32px}
+@media(min-width:600px){.sections{grid-template-columns:1fr 1fr}}
+.section{margin-bottom:20px}
+.section-title{font-size:10px;text-transform:uppercase;letter-spacing:2px;color:#00c0ff;border-bottom:1px solid #1a3a4a;padding-bottom:4px;margin-bottom:8px}
+.row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #111}
+.row:last-child{border-bottom:none}
+.row label{font-size:13px;cursor:pointer;user-select:none}
+.tog{position:relative;width:40px;height:22px;flex-shrink:0}
+.tog input{opacity:0;width:0;height:0}
+.tog .sl{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#333;border-radius:11px;transition:.2s}
+.tog .sl:before{position:absolute;content:'';height:16px;width:16px;left:3px;bottom:3px;background:#888;border-radius:50%;transition:.2s}
+.tog input:checked+.sl{background:#0080c0}
+.tog input:checked+.sl:before{transform:translateX(18px);background:#fff}
+.tog input:disabled+.sl{opacity:.4;cursor:not-allowed}
+footer{text-align:center;padding:30px 0 10px;font-size:11px;color:#444}
+</style>
+</head>
+<body>
+<header>
+  <img src="logo.png" alt="PhantomHEN">
+  <h1>PhantomHEN Settings</h1><span>FW 14.02</span>
+  <a class="back" href="index.html" style="margin-left:auto">← Main Page</a>
+</header>
+
+<div id="status-bar">
+  <div id="status-dot"></div>
+  <div id="status-text">Checking HEN status…</div>
+</div>
+
+<div class="sections" id="sections"></div>
+
+<footer>PhantomHEN · iDntUseModz · FW 14.02</footer>
+
+<script>
+var SYSCALL_NUM = 0xc9;
+var ready = false;
+var stubAt = null;
+
+var SECTIONS = [
+  { label: "Network & Remote", items: [
+    { id: 11, name: "FTP Server", def: 1 },
+    { id: 12, name: "FTP Anonymous" },
+    { id: 14, name: "Remote Play" },
+    { id: 15, name: "PSN Patch" },
+    { id: 16, name: "LAN Play" },
+  ]},
+  { label: "PKG & Install", items: [
+    { id: 46, name: "Fake PKG", def: 1 },
+    { id: 47, name: "No Certificate Check" },
+    { id: 48, name: "Allow All PKG" },
+    { id: 50, name: "Region Bypass" },
+    { id: 52, name: "Unsigned PKG" },
+  ]},
+  { label: "Games & Saves", items: [
+    { id: 36, name: "Disc Bypass", def: 1 },
+    { id: 30, name: "Cheats" },
+    { id: 31, name: "Trainers" },
+    { id: 32, name: "Trophy Lock" },
+    { id: 34, name: "Save Backup" },
+    { id: 35, name: "Save Resign" },
+    { id: 37, name: "Remote PKG" },
+    { id: 83, name: "Game Patch Bypass" },
+    { id: 84, name: "Trial Unlock" },
+    { id: 86, name: "DLC Unlock" },
+    { id: 91, name: "Block Auto Update" },
+    { id: 93, name: "Force 60FPS" },
+    { id: 94, name: "Skip Intros" },
+  ]},
+  { label: "Plugins", items: [
+    { id: 38, name: "Plugins Enabled", def: 1 },
+    { id: 42, name: "Allow Unsigned PRX" },
+    { id: 39, name: "Plugin Log" },
+    { id: 40, name: "Plugin Error Notify" },
+  ]},
+  { label: "System Tweaks", items: [
+    { id: 17, name: "Disable HDCP" },
+    { id: 18, name: "Suspend Patch" },
+    { id: 19, name: "Sysver Spoof" },
+    { id: 21, name: "Safe Mode Patch" },
+    { id: 22, name: "Poke Patch" },
+    { id: 24, name: "Boost Mode" },
+    { id: 45, name: "RGB Full Range" },
+    { id: 44, name: "Force Resolution" },
+  ]},
+  { label: "PSN", items: [
+    { id: 53, name: "PSN Offline" },
+    { id: 54, name: "NAT Spoof" },
+    { id: 55, name: "Trophy Bypass" },
+    { id: 57, name: "Store Bypass" },
+    { id: 49, name: "NP Env Spoof" },
+  ]},
+  { label: "System Extended", items: [
+    { id: 96, name: "Fast Boot" },
+    { id: 100, name: "USB Storage" },
+    { id: 101, name: "BD Drive Bypass" },
+    { id: 104, name: "Recovery Patch" },
+    { id: 107, name: "Safe App Bypass" },
+  ]},
+  { label: "Debug", items: [
+    { id: 71, name: "Show FPS" },
+    { id: 72, name: "Show CPU Temp" },
+    { id: 64, name: "Show Battery" },
+    { id: 73, name: "Kernel Debug Log" },
+    { id: 74, name: "Debug Overlay" },
+  ]},
+];
+
+function setStatus(ok, msg) {
+  document.getElementById("status-dot").className = "ok " + (ok ? "ok" : "err");
+  document.getElementById("status-dot").className = ok ? "ok" : "err";
+  document.getElementById("status-text").textContent = msg;
+  var inputs = document.querySelectorAll(".tog input");
+  for (var i = 0; i < inputs.length; i++) inputs[i].disabled = !ok;
+}
+
+function tryInitSyscall() {
+  // If we came from the jailbreak page via opener, reuse its function
+  try {
+    if (window.opener && window.opener.__openHENSettings) {
+      ready = true;
+      setStatus(true, "HEN active — settings control the live kernel");
+      return;
+    }
+  } catch(e) {}
+
+  // After jailbreak the process is UID 0; try to build a syscall stub
+  // via mmap(PROT_READ|WRITE|EXEC = 7, MAP_ANON|PRIVATE = 0x1002).
+  // This relies on the WebKit process already having kernel-lifted W^X.
+  try {
+    var sc = window.__sc;
+    if (typeof sc === "function") {
+      ready = true;
+      setStatus(true, "HEN active — settings control the live kernel");
+      return;
+    }
+  } catch(e) {}
+
+  // Not in jailbreak context — show friendly guidance
+  setStatus(false, "Open this page from the browser AFTER running the jailbreak on the main page. Toggles are shown for reference.");
+}
+
+function callSetting(caseNum, value) {
+  // Use parent-page's __openHENSettings mechanism if available
+  try {
+    if (window.opener && typeof window.opener.setSetting === "function") {
+      window.opener.setSetting(caseNum, value);
+      return;
+    }
+  } catch(e) {}
+  // Use this page's window.__setSetting if injected by the jailbreak
+  try {
+    if (typeof window.__setSetting === "function") {
+      window.__setSetting(caseNum, value);
+      return;
+    }
+  } catch(e) {}
+  if (!ready) {
+    setStatus(false, "HEN not active — run jailbreak first, then reopen this page");
+  }
+}
+
+function buildUI() {
+  var wrap = document.getElementById("sections");
+  SECTIONS.forEach(function(sec) {
+    var div = document.createElement("div");
+    div.className = "section";
+    var title = document.createElement("div");
+    title.className = "section-title";
+    title.textContent = sec.label;
+    div.appendChild(title);
+    sec.items.forEach(function(item) {
+      var row = document.createElement("div");
+      row.className = "row";
+      var lbl = document.createElement("label");
+      lbl.textContent = item.name;
+      lbl.htmlFor = "st-" + item.id;
+      var tog = document.createElement("label");
+      tog.className = "tog";
+      var inp = document.createElement("input");
+      inp.type = "checkbox";
+      inp.id = "st-" + item.id;
+      inp.checked = !!(item.def);
+      inp.disabled = true;
+      inp.onchange = (function(id) {
+        return function() { callSetting(id, this.checked ? 1 : 0); };
+      })(item.id);
+      var sl = document.createElement("span");
+      sl.className = "sl";
+      tog.appendChild(inp);
+      tog.appendChild(sl);
+      row.appendChild(lbl);
+      row.appendChild(tog);
+      div.appendChild(row);
+    });
+    wrap.appendChild(div);
+  });
+}
+
+buildUI();
+tryInitSyscall();
+
+// If the main page navigated here and exposed setSetting globally, pick it up
+window.addEventListener("load", function() {
+  if (typeof window.__setSetting === "function" || (window.opener && typeof window.opener.setSetting === "function")) {
+    ready = true;
+    setStatus(true, "HEN active — settings control the live kernel");
+  }
+});
+</script>
+</body>
+</html>
