@@ -753,27 +753,35 @@ function isPhantomHEN(blob) {
   return blob != null && blob.length > 0;
 }
 
+// Layout delta: 0 for the legacy binary (0x48f18), 0x2000 for the current build (0x4af18).
+let shnOffset = 0;
+
 function configurePhantomHEN(blob) {
   const image = new Uint8Array(blob);
   const d = new DataView(image.buffer);
   const params = host().params;
   // Legacy phantomhen.bin: exact size 0x48f18 + "SHN1" magic at 0x47a00.
+  // Current phantomhen.bin: exact size 0x4af18 + "SHN1" magic at 0x49a00 (+0x2000).
   // For custom HEN (hen.bin and others) skip the phantomhen-specific patch pass.
   const isLegacy = blob.length === 0x48f18 && d.getUint32(0x47a00, true) === 0x314e4853;
-  if (!isLegacy) {
+  const isCurrent = blob.length === 0x4af18 && d.getUint32(0x49a00, true) === 0x314e4853;
+  if (!isLegacy && !isCurrent) {
     say("[PhantomHEN] custom HEN detected — skipping legacy patch pass");
+    shnOffset = 0;
     return image;
   }
-  if (d.getUint16(0x47754, true) !== 1402 ||
-      d.getUint16(0x47a04, true) !== 1 || d.getUint16(0x47a06, true) !== 32)
+  const off = isCurrent ? 0x2000 : 0;
+  shnOffset = off;
+  if (d.getUint16(0x47754 + off, true) !== 1402 ||
+      d.getUint16(0x47a04 + off, true) !== 1 || d.getUint16(0x47a06 + off, true) !== 32)
     throw new Error("Unsupported PhantomHEN configuration");
-  const compressed = d.getUint32(0x4706c, true);
-  const elfSize = d.getUint32(0x47a10, true);
+  const compressed = d.getUint32(0x4706c + off, true);
+  const elfSize = d.getUint32(0x47a10 + off, true);
   if (compressed < 6 || compressed > 0x40800 || !elfSize || elfSize > 0x100000)
     throw new Error("PhantomHEN image sizes are invalid");
   // Honor the binary's startup configuration. The default includes the
   // shell patches needed by Debug Settings and starts the native menu.
-  let flags = d.getUint32(0x47a08, true);
+  let flags = d.getUint32(0x47a08 + off, true);
   const profiles = { full: 0x7f, minimal: 0x30, debug: 0x32 };
   const services = { ftp: 1, klog: 2, payloader: 4, menu: 8, shell: 16, notify: 32, preload: 64 };
   if (params && params.get("shnprofile")) {
@@ -790,9 +798,9 @@ function configurePhantomHEN(blob) {
     });
   }
   if (flags & ~0x7f) throw new Error("Unknown PhantomHEN options");
-  d.setUint32(0x47a08, flags, true);
-  const controls = [["shnattempts", 0x47a0c, 1, 60], ["shndelay", 0x47a0e, 0, 5000],
-                    ["shnstop", 0x47756, 0, 13]];
+  d.setUint32(0x47a08 + off, flags, true);
+  const controls = [["shnattempts", 0x47a0c + off, 1, 60], ["shndelay", 0x47a0e + off, 0, 5000],
+                    ["shnstop", 0x47756 + off, 0, 13]];
   controls.forEach(function (item) {
     const raw = params && params.get(item[0]);
     const value = raw === null || raw === undefined ? d.getUint16(item[1], true) : Number(raw);
@@ -801,18 +809,18 @@ function configurePhantomHEN(blob) {
       throw new Error("Invalid PhantomHEN " + item[0]);
     d.setUint16(item[1], value, true);
   });
-  d.setUint32(0x47000, 0, true);
-  d.setUint32(0x47004, 0, true);
+  d.setUint32(0x47000 + off, 0, true);
+  d.setUint32(0x47004 + off, 0, true);
   /* Host address for the payload's klog stream (UDP 3232, one line per
      datagram).  A non-dotted hostname leaves both words zero and the payload
      skips the stream. */
   const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(location.hostname);
   const oct = m ? m.slice(1).map(Number) : [];
-  const ip = oct.length === 4 && oct.every(function (o) { return o <= 255; })
+  const ip = oct.length === 4 && oct.every(function (n) { return n <= 255; })
     ? (oct[0] | (oct[1] << 8) | (oct[2] << 16) | (oct[3] << 24)) >>> 0
     : 0;
-  d.setUint32(0x47a14, ip, true);
-  d.setUint16(0x47a18, 3232, true);
+  d.setUint32(0x47a14 + off, ip, true);
+  d.setUint16(0x47a18 + off, 3232, true);
   say("[PhantomHEN] 14.02 startup options 0x" + flags.toString(16));
   return image;
 }
@@ -834,13 +842,14 @@ function monitorPhantomHEN(entry) {
     228: "invalid ELF", 229: "executable allocation failed", 230: "ELF mapping failed",
     231: "kernel startup failed", 232: "invalid image configuration"
   };
+  const off = shnOffset;
   const timer = setInterval(function () {
     polls++;
-    const stage = rd4(plus(entry, 0x47000)) >>> 0;
-    const value = rd4(plus(entry, 0x47004)) >>> 0;
-    if ((rd4(plus(entry, 0x47008)) >>> 0) === 0x31564353) {
+    const stage = rd4(plus(entry, 0x47000 + off)) >>> 0;
+    const value = rd4(plus(entry, 0x47004 + off)) >>> 0;
+    if ((rd4(plus(entry, 0x47008 + off)) >>> 0) === 0x31564353) {
       const details = [];
-      for (let i = 0; i < 6; i++) details.push(rd4(plus(entry, 0x4700c + i * 4)) >>> 0);
+      for (let i = 0; i < 6; i++) details.push(rd4(plus(entry, 0x4700c + off + i * 4)) >>> 0);
       const signature = details.join(",");
       if (signature !== lastServices) {
         lastServices = signature;
