@@ -72,6 +72,25 @@ function showToast(name, on) {
   }, 2200);
 }
 
+var LS_KEY = "phen_settings";
+
+function loadAll() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY) || "{}"); } catch(e) { return {}; }
+}
+function saveSetting(id, checked) {
+  try {
+    var s = loadAll();
+    s[id] = checked ? 1 : 0;
+    localStorage.setItem(LS_KEY, JSON.stringify(s));
+  } catch(e) {}
+}
+function loadSetting(id) {
+  try {
+    var s = loadAll();
+    return (id in s) ? !!s[id] : null;
+  } catch(e) { return null; }
+}
+
 var SYSCALL_NUM = 0xc9;
 var ready = false;
 var stubAt = null;
@@ -217,10 +236,15 @@ function buildUI() {
       var inp = document.createElement("input");
       inp.type = "checkbox";
       inp.id = "st-" + item.id;
-      inp.checked = !!(item.def);
+      var saved = loadSetting(item.id);
+      inp.checked = saved !== null ? saved : !!(item.def);
       inp.disabled = false;
       inp.onchange = (function(id, name) {
-        return function() { callSetting(id, this.checked ? 1 : 0); showToast(name, this.checked); };
+        return function() {
+          saveSetting(id, this.checked);
+          callSetting(id, this.checked ? 1 : 0);
+          showToast(name, this.checked);
+        };
       })(item.id, item.name);
       var sl = document.createElement("span");
       sl.className = "sl";
