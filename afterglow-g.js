@@ -851,163 +851,241 @@ function setSetting(caseNum, value) {
   try { sc(0xc9, caseNum, vb.at); } catch (e) { say("[settings] sc error case " + caseNum + ": " + e); }
 }
 
-function showSettingsPanel() {
-  const DEFS = {
-    11: 1, 36: 1, 38: 1, 46: 1
-  };
-  const SECTIONS = [
-    { label: "Network & Remote", items: [
-      { id: 11, name: "FTP Server" },
-      { id: 12, name: "FTP Anonymous" },
-      { id: 14, name: "Remote Play" },
-      { id: 15, name: "PSN Patch" },
-      { id: 16, name: "LAN Play" },
-    ]},
-    { label: "PKG & Install", items: [
-      { id: 46, name: "Fake PKG" },
-      { id: 47, name: "No Certificate Check" },
-      { id: 48, name: "Allow All PKG" },
-      { id: 50, name: "Region Bypass" },
-      { id: 52, name: "Unsigned PKG" },
-    ]},
-    { label: "Games & Saves", items: [
-      { id: 36, name: "Disc Bypass" },
-      { id: 30, name: "Cheats" },
-      { id: 31, name: "Trainers" },
-      { id: 32, name: "Trophy Lock" },
-      { id: 34, name: "Save Backup" },
-      { id: 35, name: "Save Resign" },
-      { id: 37, name: "Remote PKG" },
-      { id: 83, name: "Game Patch Bypass" },
-      { id: 84, name: "Trial Unlock" },
-      { id: 86, name: "DLC Unlock" },
-      { id: 91, name: "Block Auto Update" },
-      { id: 93, name: "Force 60FPS" },
-      { id: 94, name: "Skip Intros" },
-    ]},
-    { label: "Plugins", items: [
-      { id: 38, name: "Plugins Enabled" },
-      { id: 42, name: "Allow Unsigned PRX" },
-      { id: 39, name: "Plugin Log" },
-      { id: 40, name: "Plugin Error Notify" },
-    ]},
-    { label: "System Tweaks", items: [
-      { id: 17, name: "Disable HDCP" },
-      { id: 18, name: "Suspend Patch" },
-      { id: 19, name: "Sysver Spoof" },
-      { id: 21, name: "Safe Mode Patch" },
-      { id: 22, name: "Poke Patch" },
-      { id: 24, name: "Boost Mode" },
-      { id: 45, name: "RGB Full Range" },
-      { id: 44, name: "Force Resolution" },
-    ]},
-    { label: "PSN", items: [
-      { id: 53, name: "PSN Offline" },
-      { id: 54, name: "NAT Spoof" },
-      { id: 55, name: "Trophy Bypass" },
-      { id: 57, name: "Store Bypass" },
-      { id: 49, name: "NP Env Spoof" },
-    ]},
-    { label: "System Extended", items: [
-      { id: 96, name: "Fast Boot" },
-      { id: 100, name: "USB Storage" },
-      { id: 101, name: "BD Drive Bypass" },
-      { id: 104, name: "Recovery Patch" },
-      { id: 107, name: "Safe App Bypass" },
-    ]},
-    { label: "Debug", items: [
-      { id: 71, name: "Show FPS" },
-      { id: 72, name: "Show CPU Temp" },
-      { id: 64, name: "Show Battery" },
-      { id: 73, name: "Kernel Debug Log" },
-      { id: 74, name: "Debug Overlay" },
-    ]},
-  ];
+/* ── in-page settings panel ── */
+const LS_KEY = "phen_settings";
+function phenLoadAll(){try{return JSON.parse(localStorage.getItem(LS_KEY)||"{}");}catch(e){return{};}}
+function phenPersist(id,val){try{var s=phenLoadAll();s[id]=val;localStorage.setItem(LS_KEY,JSON.stringify(s));}catch(e){}}
+function phenStored(id){try{var s=phenLoadAll();return id in s?s[id]:null;}catch(e){return null;}}
 
-  const style = document.createElement("style");
-  style.textContent = [
-    "#phen-panel{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.92);z-index:99999;overflow-y:auto;box-sizing:border-box;padding:24px 20px 40px;font-family:sans-serif;color:#e0e0e0}",
-    "#phen-panel h1{margin:0 0 6px;font-size:22px;color:#00c0ff;letter-spacing:1px}",
-    "#phen-panel .sub{font-size:12px;color:#888;margin-bottom:20px}",
-    "#phen-panel .section{margin-bottom:18px}",
-    "#phen-panel .section-title{font-size:11px;text-transform:uppercase;letter-spacing:2px;color:#00c0ff;border-bottom:1px solid #1a3a4a;padding-bottom:4px;margin-bottom:10px}",
-    "#phen-panel .row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #111}",
-    "#phen-panel .row:last-child{border-bottom:none}",
-    "#phen-panel .row label{font-size:13px;cursor:pointer;user-select:none}",
-    "#phen-panel .tog{position:relative;width:40px;height:22px;flex-shrink:0}",
-    "#phen-panel .tog input{opacity:0;width:0;height:0}",
-    "#phen-panel .tog .sl{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#333;border-radius:11px;transition:.2s}",
-    "#phen-panel .tog .sl:before{position:absolute;content:'';height:16px;width:16px;left:3px;bottom:3px;background:#888;border-radius:50%;transition:.2s}",
-    "#phen-panel .tog input:checked+.sl{background:#0080c0}",
-    "#phen-panel .tog input:checked+.sl:before{transform:translateX(18px);background:#fff}",
-    "#phen-panel #phen-close{position:fixed;top:14px;right:18px;background:#1a3a4a;border:none;color:#00c0ff;font-size:18px;padding:4px 12px;border-radius:6px;cursor:pointer;z-index:100000}",
-    "@media(min-width:640px){#phen-panel{padding:28px 40px 60px}#phen-panel .sections{display:grid;grid-template-columns:1fr 1fr;gap:0 32px}}",
+function phenToast(name,val,type){
+  var wrap=document.getElementById("phen-toast-wrap");
+  if(!wrap){wrap=document.createElement("div");wrap.id="phen-toast-wrap";
+    wrap.style.cssText="position:fixed;bottom:24px;right:20px;display:flex;flex-direction:column-reverse;gap:8px;z-index:999999;pointer-events:none";
+    document.body.appendChild(wrap);}
+  var t=document.createElement("div");
+  t.style.cssText="background:#111;border:1px solid #1a3a4a;color:#e0e0e0;font-size:12px;padding:9px 14px;border-radius:6px;display:flex;align-items:center;gap:8px;min-width:200px;max-width:300px;opacity:0;transform:translateX(20px);transition:opacity .2s,transform .2s";
+  var dotColor=type==="toggle"?(val?"#00c060":"#cc0000"):"#0080c0";
+  var label=type==="toggle"?("<b>"+(val?"ON":"OFF")+"</b>"):("<b>"+val+"</b>");
+  t.innerHTML='<span style="width:7px;height:7px;border-radius:50%;background:'+dotColor+';flex-shrink:0;display:inline-block"></span>'+name+": "+label;
+  wrap.appendChild(t);
+  requestAnimationFrame(function(){requestAnimationFrame(function(){t.style.opacity="1";t.style.transform="translateX(0)";});});
+  setTimeout(function(){t.style.opacity="0";t.style.transform="translateX(20px)";setTimeout(function(){if(t.parentNode)t.parentNode.removeChild(t);},250);},2500);
+}
+
+const PHEN_SECTIONS = [
+  {label:"Network & Remote",items:[
+    {id:11,name:"FTP Server",def:1,type:"toggle"},
+    {id:12,name:"FTP Anonymous",def:0,type:"toggle"},
+    {id:13,name:"FTP Port",def:2121,type:"number",min:1,max:65535},
+    {id:14,name:"Remote Play",def:0,type:"toggle"},
+    {id:15,name:"PSN Patch",def:0,type:"toggle"},
+    {id:16,name:"LAN Play",def:0,type:"toggle"},
+  ]},
+  {label:"PKG & Install",items:[
+    {id:46,name:"Fake PKG",def:1,type:"toggle"},
+    {id:47,name:"No Cert Check",def:1,type:"toggle"},
+    {id:48,name:"Allow All PKG",def:1,type:"toggle"},
+    {id:52,name:"Unsigned PKG",def:1,type:"toggle"},
+    {id:50,name:"Region Bypass",def:0,type:"toggle"},
+    {id:49,name:"NP Env Spoof",def:0,type:"toggle"},
+  ]},
+  {label:"Games & Saves",items:[
+    {id:36,name:"Disc Bypass",def:1,type:"toggle"},
+    {id:30,name:"Cheats",def:0,type:"toggle"},
+    {id:31,name:"Trainers",def:0,type:"toggle"},
+    {id:32,name:"Trophy Lock",def:0,type:"toggle"},
+    {id:34,name:"Save Backup",def:0,type:"toggle"},
+    {id:35,name:"Save Resign",def:0,type:"toggle"},
+    {id:37,name:"Remote PKG",def:0,type:"toggle"},
+    {id:83,name:"Game Patch Bypass",def:0,type:"toggle"},
+    {id:84,name:"Trial Unlock",def:0,type:"toggle"},
+    {id:86,name:"DLC Unlock",def:0,type:"toggle"},
+    {id:91,name:"Block Auto Update",def:0,type:"toggle"},
+    {id:93,name:"Force 60FPS",def:0,type:"toggle"},
+    {id:94,name:"Skip Intros",def:0,type:"toggle"},
+  ]},
+  {label:"Plugins",items:[
+    {id:38,name:"Plugins Enabled",def:1,type:"toggle"},
+    {id:42,name:"Allow Unsigned PRX",def:0,type:"toggle"},
+    {id:39,name:"Plugin Log",def:0,type:"toggle"},
+    {id:40,name:"Plugin Error Notify",def:0,type:"toggle"},
+  ]},
+  {label:"System Tweaks",items:[
+    {id:17,name:"Disable HDCP",def:0,type:"toggle"},
+    {id:18,name:"Suspend Patch",def:0,type:"toggle"},
+    {id:19,name:"Sysver Spoof",def:0,type:"toggle"},
+    {id:"19t",name:"Spoof Version",def:"09.00",type:"text",placeholder:"e.g. 09.00"},
+    {id:21,name:"Safe Mode Patch",def:0,type:"toggle"},
+    {id:22,name:"Poke Patch",def:0,type:"toggle"},
+    {id:24,name:"Boost Mode",def:0,type:"toggle"},
+    {id:45,name:"RGB Full Range",def:0,type:"toggle"},
+    {id:44,name:"Force Resolution",def:0,type:"select",opts:[
+      {label:"Default",val:0},{label:"720p",val:1},{label:"1080p",val:2},{label:"4K",val:3}
+    ]},
+  ]},
+  {label:"PSN",items:[
+    {id:53,name:"PSN Offline",def:0,type:"toggle"},
+    {id:54,name:"NAT Spoof",def:0,type:"toggle"},
+    {id:55,name:"Trophy Bypass",def:0,type:"toggle"},
+    {id:57,name:"Store Bypass",def:0,type:"toggle"},
+    {id:58,name:"Online ID Spoof",def:0,type:"toggle"},
+    {id:"58t",name:"Spoofed ID",def:"",type:"text",placeholder:"fake PSN name"},
+  ]},
+  {label:"Display & UI",items:[
+    {id:61,name:"Notify Style",def:0,type:"select",opts:[
+      {label:"Default",val:0},{label:"Minimal",val:1},{label:"Large",val:2},{label:"Off",val:3}
+    ]},
+    {id:67,name:"Notify Duration",def:5,type:"number",min:1,max:30,unit:"s"},
+    {id:63,name:"Clock 24h",def:0,type:"toggle"},
+    {id:64,name:"Show Battery %",def:0,type:"toggle"},
+    {id:71,name:"Show FPS",def:0,type:"toggle"},
+    {id:72,name:"Show CPU Temp",def:0,type:"toggle"},
+    {id:68,name:"Disable Popups",def:0,type:"toggle"},
+    {id:70,name:"Menu Alpha",def:85,type:"range",min:0,max:100,unit:"%"},
+  ]},
+  {label:"System Extended",items:[
+    {id:96,name:"Fast Boot",def:0,type:"toggle"},
+    {id:100,name:"USB Storage",def:0,type:"toggle"},
+    {id:101,name:"BD Drive Bypass",def:0,type:"toggle"},
+    {id:104,name:"Recovery Patch",def:0,type:"toggle"},
+    {id:107,name:"Safe App Bypass",def:1,type:"toggle"},
+    {id:108,name:"Emergency Bypass",def:0,type:"toggle"},
+  ]},
+  {label:"Debug",items:[
+    {id:73,name:"Kernel Debug Log",def:0,type:"toggle"},
+    {id:74,name:"Debug Overlay",def:0,type:"toggle"},
+    {id:75,name:"Core Dump",def:0,type:"toggle"},
+    {id:77,name:"Net Debug Log",def:0,type:"toggle"},
+    {id:79,name:"Memory Debug",def:0,type:"toggle"},
+    {id:81,name:"Crash Report",def:0,type:"toggle"},
+  ]},
+];
+
+function makePhenCtrl(item){
+  if(item.type==="toggle"){
+    var w=document.createElement("label");w.className="phen-tog";
+    var i=document.createElement("input");i.type="checkbox";i.id="phen-t-"+item.id;
+    var sv=phenStored(item.id);i.checked=sv!==null?!!sv:!!item.def;
+    var sl=document.createElement("span");sl.className="phen-sl";
+    i.onchange=(function(it){return function(){
+      phenPersist(it.id,this.checked?1:0);
+      setSetting(it.id,this.checked?1:0);
+      phenToast(it.name,this.checked,"toggle");
+    };})(item);
+    w.appendChild(i);w.appendChild(sl);return w;
+  }
+  if(item.type==="number"){
+    var i=document.createElement("input");i.type="number";i.className="phen-num";
+    i.min=item.min||0;i.max=item.max||9999;i.step=1;
+    var sv=phenStored(item.id);i.value=sv!==null?sv:item.def;
+    i.onchange=(function(it){return function(){
+      var v=Math.min(Math.max(parseInt(this.value)||it.def,it.min||0),it.max||9999);
+      this.value=v;phenPersist(it.id,v);setSetting(it.id,v);
+      phenToast(it.name,v+(it.unit||""),"value");
+    };})(item);
+    return i;
+  }
+  if(item.type==="select"){
+    var s=document.createElement("select");s.className="phen-sel";
+    var sv=phenStored(item.id);var cur=sv!==null?sv:item.def;
+    (item.opts||[]).forEach(function(o){
+      var opt=document.createElement("option");opt.value=o.val;opt.textContent=o.label;
+      if(cur==o.val)opt.selected=true;s.appendChild(opt);
+    });
+    s.onchange=(function(it){return function(){
+      var v=parseInt(this.value);phenPersist(it.id,v);setSetting(it.id,v);
+      phenToast(it.name,this.options[this.selectedIndex].text,"value");
+    };})(item);
+    return s;
+  }
+  if(item.type==="text"){
+    var i=document.createElement("input");i.type="text";i.className="phen-txt";
+    i.placeholder=item.placeholder||"";
+    var sv=phenStored(item.id);i.value=sv!==null?sv:(item.def||"");
+    i.onchange=(function(it){return function(){
+      phenPersist(it.id,this.value);
+      phenToast(it.name,this.value||"(cleared)","value");
+    };})(item);
+    return i;
+  }
+  if(item.type==="range"){
+    var w=document.createElement("div");w.style.cssText="display:flex;align-items:center;gap:6px;flex-shrink:0";
+    var r=document.createElement("input");r.type="range";r.className="phen-range";
+    r.min=item.min||0;r.max=item.max||100;r.step=1;
+    var sv=phenStored(item.id);r.value=sv!==null?sv:item.def;
+    var lv=document.createElement("span");lv.style.cssText="font-size:11px;color:#888;width:34px;text-align:right";
+    lv.textContent=r.value+(item.unit||"");
+    r.oninput=function(){lv.textContent=this.value+(item.unit||"");};
+    r.onchange=(function(it,l){return function(){
+      l.textContent=this.value+(it.unit||"");
+      var v=parseInt(this.value);phenPersist(it.id,v);setSetting(it.id,v);
+      phenToast(it.name,this.value+(it.unit||""),"value");
+    };})(item,lv);
+    w.appendChild(r);w.appendChild(lv);return w;
+  }
+  return null;
+}
+
+function showSettingsPanel() {
+  if(document.getElementById("phen-panel")){document.getElementById("phen-panel").remove();}
+  var existing=document.getElementById("phen-style");if(existing)existing.remove();
+
+  var style=document.createElement("style");style.id="phen-style";
+  style.textContent=[
+    "#phen-panel{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.93);z-index:99999;overflow-y:auto;box-sizing:border-box;padding:60px 20px 40px;font-family:sans-serif;color:#e0e0e0}",
+    "#phen-panel h2{margin:0 0 4px;font-size:20px;color:#00c0ff;letter-spacing:1px}",
+    "#phen-panel .sub{font-size:11px;color:#888;margin-bottom:18px}",
+    "#phen-panel .phen-sections{display:grid;grid-template-columns:1fr;gap:0 32px}",
+    "@media(min-width:600px){#phen-panel .phen-sections{grid-template-columns:1fr 1fr}}",
+    "#phen-panel .psec{margin-bottom:20px}",
+    "#phen-panel .psec-title{font-size:10px;text-transform:uppercase;letter-spacing:2px;color:#00c0ff;border-bottom:1px solid #1a3a4a;padding-bottom:4px;margin-bottom:8px}",
+    "#phen-panel .prow{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #111;gap:8px}",
+    "#phen-panel .prow:last-child{border-bottom:none}",
+    "#phen-panel .prow .prl{font-size:13px;flex:1;min-width:0}",
+    "#phen-panel .phen-tog{position:relative;width:40px;height:22px;flex-shrink:0}",
+    "#phen-panel .phen-tog input{opacity:0;width:0;height:0}",
+    "#phen-panel .phen-sl{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#333;border-radius:11px;transition:.2s}",
+    "#phen-panel .phen-sl:before{position:absolute;content:'';height:16px;width:16px;left:3px;bottom:3px;background:#888;border-radius:50%;transition:.2s}",
+    "#phen-panel .phen-tog input:checked+.phen-sl{background:#0080c0}",
+    "#phen-panel .phen-tog input:checked+.phen-sl:before{transform:translateX(18px);background:#fff}",
+    "#phen-panel .phen-num,.phen-txt{background:#111;border:1px solid #1a3a4a;color:#e0e0e0;padding:4px 8px;font-family:'Courier New',monospace;font-size:12px;border-radius:4px;width:88px;text-align:right;outline:none}",
+    "#phen-panel .phen-txt{text-align:left;width:120px}",
+    "#phen-panel .phen-sel{background:#111;border:1px solid #1a3a4a;color:#e0e0e0;padding:4px 6px;font-size:12px;border-radius:4px;outline:none;cursor:pointer;max-width:130px}",
+    "#phen-panel .phen-range{-webkit-appearance:none;width:90px;height:4px;background:#333;border-radius:2px;outline:none;cursor:pointer}",
+    "#phen-panel .phen-range::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:#0080c0;cursor:pointer}",
+    "#phen-close{position:fixed;top:14px;right:14px;background:#1a1a1a;border:1px solid #cc0000;color:#fff;font-size:13px;padding:6px 14px;border-radius:4px;cursor:pointer;z-index:100000;font-family:'Courier New',monospace;letter-spacing:.08em}",
+    "#phen-settingslink{position:fixed;top:14px;left:14px;background:transparent;border:1px solid #1a3a4a;color:#00c0ff;font-size:12px;padding:6px 12px;border-radius:4px;cursor:pointer;z-index:100000;font-family:'Courier New',monospace;text-decoration:none}",
   ].join("\n");
   document.head.appendChild(style);
 
-  const panel = document.createElement("div");
-  panel.id = "phen-panel";
+  var panel=document.createElement("div");panel.id="phen-panel";
 
-  const closeBtn = document.createElement("button");
-  closeBtn.id = "phen-close";
-  closeBtn.textContent = "✕ Close";
-  closeBtn.onclick = function () { panel.remove(); style.remove(); };
-  panel.appendChild(closeBtn);
+  var closeBtn=document.createElement("button");closeBtn.id="phen-close";closeBtn.textContent="✕ Close";
+  closeBtn.onclick=function(){panel.remove();style.remove();};
+  document.body.appendChild(closeBtn);
 
-  const h1 = document.createElement("h1");
-  h1.textContent = "PhantomHEN Settings";
-  panel.appendChild(h1);
+  var extLink=document.createElement("a");extLink.id="phen-settingslink";
+  extLink.href="settings.html";extLink.textContent="⬡ Full Page";
+  document.body.appendChild(extLink);
 
-  const sub = document.createElement("div");
-  sub.className = "sub";
-  sub.textContent = "FW 14.02 · iDntUseModz · Changes apply immediately";
-  panel.appendChild(sub);
+  var h2=document.createElement("h2");h2.textContent="PhantomHEN Settings";panel.appendChild(h2);
+  var sub=document.createElement("div");sub.className="sub";
+  sub.textContent="FW 14.02 · iDntUseModz · Changes apply immediately";panel.appendChild(sub);
 
-  const sectionsWrap = document.createElement("div");
-  sectionsWrap.className = "sections";
-  panel.appendChild(sectionsWrap);
+  var sw=document.createElement("div");sw.className="phen-sections";panel.appendChild(sw);
 
-  SECTIONS.forEach(function (sec) {
-    const wrap = document.createElement("div");
-    wrap.className = "section";
-
-    const title = document.createElement("div");
-    title.className = "section-title";
-    title.textContent = sec.label;
-    wrap.appendChild(title);
-
-    sec.items.forEach(function (item) {
-      const row = document.createElement("div");
-      row.className = "row";
-
-      const lbl = document.createElement("label");
-      lbl.textContent = item.name;
-      lbl.htmlFor = "phen-t-" + item.id;
-
-      const tog = document.createElement("label");
-      tog.className = "tog";
-
-      const inp = document.createElement("input");
-      inp.type = "checkbox";
-      inp.id = "phen-t-" + item.id;
-      inp.checked = !!(DEFS[item.id] || 0);
-
-      inp.onchange = (function (caseNum) {
-        return function () { setSetting(caseNum, this.checked ? 1 : 0); };
-      })(item.id);
-
-      const sl = document.createElement("span");
-      sl.className = "sl";
-
-      tog.appendChild(inp);
-      tog.appendChild(sl);
-
+  PHEN_SECTIONS.forEach(function(sec){
+    var div=document.createElement("div");div.className="psec";
+    var t=document.createElement("div");t.className="psec-title";t.textContent=sec.label;div.appendChild(t);
+    sec.items.forEach(function(item){
+      var row=document.createElement("div");row.className="prow";
+      var lbl=document.createElement("span");lbl.className="prl";lbl.textContent=item.name;
       row.appendChild(lbl);
-      row.appendChild(tog);
-      wrap.appendChild(row);
+      var ctrl=makePhenCtrl(item);
+      if(ctrl)row.appendChild(ctrl);
+      div.appendChild(row);
     });
-
-    sectionsWrap.appendChild(wrap);
+    sw.appendChild(div);
   });
 
   document.body.appendChild(panel);
@@ -1063,6 +1141,15 @@ function monitorPhantomHEN(entry) {
         say("PhantomHEN loaded — iDntUseModz");
         setSetting(11, 1);
         window.__openHENSettings = showSettingsPanel;
+        /* Floating settings button — always visible after jailbreak */
+        if (!document.getElementById("phen-fab")) {
+          var fab = document.createElement("button");
+          fab.id = "phen-fab";
+          fab.textContent = "⚙ HEN Settings";
+          fab.style.cssText = "position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#0a0a0a;border:1px solid #cc0000;color:#fff;padding:10px 28px;font-family:'Courier New',monospace;font-size:.85rem;letter-spacing:.12em;cursor:pointer;z-index:9998;border-radius:4px;text-shadow:0 0 6px #ff4444;box-shadow:0 0 12px #2a0000";
+          fab.onclick = function () { showSettingsPanel(); };
+          document.body.appendChild(fab);
+        }
         showSettingsPanel();
       }
       if ((stage === 13 || stage === 64) && value)
