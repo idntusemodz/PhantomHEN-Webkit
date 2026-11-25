@@ -1062,6 +1062,9 @@ function monitorPhantomHEN(entry) {
       if (stage === 13 || stage === 64) {
         say("PhantomHEN loaded — iDntUseModz");
         setSetting(11, 1);
+        window.__openHENSettings = showSettingsPanel;
+        var btn = document.getElementById("hen-settings-btn");
+        if (btn) btn.style.display = "inline-block";
         showSettingsPanel();
       }
       if ((stage === 13 || stage === 64) && value)
