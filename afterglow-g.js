@@ -777,7 +777,7 @@ function configurePhantomHEN(blob) {
     throw new Error("Unsupported PhantomHEN configuration");
   const compressed = d.getUint32(0x4706c + off, true);
   const elfSize = d.getUint32(0x47a10 + off, true);
-  if (compressed < 6 || compressed > 0x40800 || !elfSize || elfSize > 0x100000)
+  if (compressed < 6 || compressed > 0x48000 || !elfSize || elfSize > 0x100000)
     throw new Error("PhantomHEN image sizes are invalid");
   // Honor the binary's startup configuration. The default includes the
   // shell patches needed by Debug Settings and starts the native menu.
