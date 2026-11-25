@@ -825,6 +825,194 @@ function configurePhantomHEN(blob) {
   return image;
 }
 
+// ---------------------------------------------------------------------------
+// HEN Settings panel — shown after PhantomHEN loads (stage 13/64)
+// Calls the custom syscall 0xc9 (settings_syscall_handler) installed by HEN.
+// All cases use pointer-to-value convention: param_2[0]=caseNum, param_2[1]=&value.
+// ---------------------------------------------------------------------------
+
+function ensureSettingStub() {
+  if (STATE.stubs[0xc9]) return true;
+  const r = sc(S.mmap, 0, 0x1000, 7, 0x1002, -1, 0);
+  if (r.i32 === -1) { say("[settings] mmap for syscall stub failed"); return false; }
+  const p = v(r.lo, r.hi);
+  // mov eax, 0xc9; syscall; ret
+  const bytes = [0xb8, 0xc9, 0x00, 0x00, 0x00, 0x0f, 0x05, 0xc3];
+  for (let i = 0; i < bytes.length; i++) wr1(plus(p, i), bytes[i]);
+  STATE.stubs[0xc9] = p;
+  return true;
+}
+
+function setSetting(caseNum, value) {
+  if (!ensureSettingStub()) return;
+  const vb = alloc(8);
+  vb.u32[0] = value >>> 0;
+  vb.u32[1] = 0;
+  try { sc(0xc9, caseNum, vb.at); } catch (e) { say("[settings] sc error case " + caseNum + ": " + e); }
+}
+
+function showSettingsPanel() {
+  const DEFS = {
+    11: 1, 36: 1, 38: 1, 46: 1
+  };
+  const SECTIONS = [
+    { label: "Network & Remote", items: [
+      { id: 11, name: "FTP Server" },
+      { id: 12, name: "FTP Anonymous" },
+      { id: 14, name: "Remote Play" },
+      { id: 15, name: "PSN Patch" },
+      { id: 16, name: "LAN Play" },
+    ]},
+    { label: "PKG & Install", items: [
+      { id: 46, name: "Fake PKG" },
+      { id: 47, name: "No Certificate Check" },
+      { id: 48, name: "Allow All PKG" },
+      { id: 50, name: "Region Bypass" },
+      { id: 52, name: "Unsigned PKG" },
+    ]},
+    { label: "Games & Saves", items: [
+      { id: 36, name: "Disc Bypass" },
+      { id: 30, name: "Cheats" },
+      { id: 31, name: "Trainers" },
+      { id: 32, name: "Trophy Lock" },
+      { id: 34, name: "Save Backup" },
+      { id: 35, name: "Save Resign" },
+      { id: 37, name: "Remote PKG" },
+      { id: 83, name: "Game Patch Bypass" },
+      { id: 84, name: "Trial Unlock" },
+      { id: 86, name: "DLC Unlock" },
+      { id: 91, name: "Block Auto Update" },
+      { id: 93, name: "Force 60FPS" },
+      { id: 94, name: "Skip Intros" },
+    ]},
+    { label: "Plugins", items: [
+      { id: 38, name: "Plugins Enabled" },
+      { id: 42, name: "Allow Unsigned PRX" },
+      { id: 39, name: "Plugin Log" },
+      { id: 40, name: "Plugin Error Notify" },
+    ]},
+    { label: "System Tweaks", items: [
+      { id: 17, name: "Disable HDCP" },
+      { id: 18, name: "Suspend Patch" },
+      { id: 19, name: "Sysver Spoof" },
+      { id: 21, name: "Safe Mode Patch" },
+      { id: 22, name: "Poke Patch" },
+      { id: 24, name: "Boost Mode" },
+      { id: 45, name: "RGB Full Range" },
+      { id: 44, name: "Force Resolution" },
+    ]},
+    { label: "PSN", items: [
+      { id: 53, name: "PSN Offline" },
+      { id: 54, name: "NAT Spoof" },
+      { id: 55, name: "Trophy Bypass" },
+      { id: 57, name: "Store Bypass" },
+      { id: 49, name: "NP Env Spoof" },
+    ]},
+    { label: "System Extended", items: [
+      { id: 96, name: "Fast Boot" },
+      { id: 100, name: "USB Storage" },
+      { id: 101, name: "BD Drive Bypass" },
+      { id: 104, name: "Recovery Patch" },
+      { id: 107, name: "Safe App Bypass" },
+    ]},
+    { label: "Debug", items: [
+      { id: 71, name: "Show FPS" },
+      { id: 72, name: "Show CPU Temp" },
+      { id: 64, name: "Show Battery" },
+      { id: 73, name: "Kernel Debug Log" },
+      { id: 74, name: "Debug Overlay" },
+    ]},
+  ];
+
+  const style = document.createElement("style");
+  style.textContent = [
+    "#phen-panel{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.92);z-index:99999;overflow-y:auto;box-sizing:border-box;padding:24px 20px 40px;font-family:sans-serif;color:#e0e0e0}",
+    "#phen-panel h1{margin:0 0 6px;font-size:22px;color:#00c0ff;letter-spacing:1px}",
+    "#phen-panel .sub{font-size:12px;color:#888;margin-bottom:20px}",
+    "#phen-panel .section{margin-bottom:18px}",
+    "#phen-panel .section-title{font-size:11px;text-transform:uppercase;letter-spacing:2px;color:#00c0ff;border-bottom:1px solid #1a3a4a;padding-bottom:4px;margin-bottom:10px}",
+    "#phen-panel .row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #111}",
+    "#phen-panel .row:last-child{border-bottom:none}",
+    "#phen-panel .row label{font-size:13px;cursor:pointer;user-select:none}",
+    "#phen-panel .tog{position:relative;width:40px;height:22px;flex-shrink:0}",
+    "#phen-panel .tog input{opacity:0;width:0;height:0}",
+    "#phen-panel .tog .sl{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#333;border-radius:11px;transition:.2s}",
+    "#phen-panel .tog .sl:before{position:absolute;content:'';height:16px;width:16px;left:3px;bottom:3px;background:#888;border-radius:50%;transition:.2s}",
+    "#phen-panel .tog input:checked+.sl{background:#0080c0}",
+    "#phen-panel .tog input:checked+.sl:before{transform:translateX(18px);background:#fff}",
+    "#phen-panel #phen-close{position:fixed;top:14px;right:18px;background:#1a3a4a;border:none;color:#00c0ff;font-size:18px;padding:4px 12px;border-radius:6px;cursor:pointer;z-index:100000}",
+    "@media(min-width:640px){#phen-panel{padding:28px 40px 60px}#phen-panel .sections{display:grid;grid-template-columns:1fr 1fr;gap:0 32px}}",
+  ].join("\n");
+  document.head.appendChild(style);
+
+  const panel = document.createElement("div");
+  panel.id = "phen-panel";
+
+  const closeBtn = document.createElement("button");
+  closeBtn.id = "phen-close";
+  closeBtn.textContent = "✕ Close";
+  closeBtn.onclick = function () { panel.remove(); style.remove(); };
+  panel.appendChild(closeBtn);
+
+  const h1 = document.createElement("h1");
+  h1.textContent = "PhantomHEN Settings";
+  panel.appendChild(h1);
+
+  const sub = document.createElement("div");
+  sub.className = "sub";
+  sub.textContent = "FW 14.02 · iDntUseModz · Changes apply immediately";
+  panel.appendChild(sub);
+
+  const sectionsWrap = document.createElement("div");
+  sectionsWrap.className = "sections";
+  panel.appendChild(sectionsWrap);
+
+  SECTIONS.forEach(function (sec) {
+    const wrap = document.createElement("div");
+    wrap.className = "section";
+
+    const title = document.createElement("div");
+    title.className = "section-title";
+    title.textContent = sec.label;
+    wrap.appendChild(title);
+
+    sec.items.forEach(function (item) {
+      const row = document.createElement("div");
+      row.className = "row";
+
+      const lbl = document.createElement("label");
+      lbl.textContent = item.name;
+      lbl.htmlFor = "phen-t-" + item.id;
+
+      const tog = document.createElement("label");
+      tog.className = "tog";
+
+      const inp = document.createElement("input");
+      inp.type = "checkbox";
+      inp.id = "phen-t-" + item.id;
+      inp.checked = !!(DEFS[item.id] || 0);
+
+      inp.onchange = (function (caseNum) {
+        return function () { setSetting(caseNum, this.checked ? 1 : 0); };
+      })(item.id);
+
+      const sl = document.createElement("span");
+      sl.className = "sl";
+
+      tog.appendChild(inp);
+      tog.appendChild(sl);
+
+      row.appendChild(lbl);
+      row.appendChild(tog);
+      wrap.appendChild(row);
+    });
+
+    sectionsWrap.appendChild(wrap);
+  });
+
+  document.body.appendChild(panel);
+}
+
 function monitorPhantomHEN(entry) {
   let last = -1, polls = 0, lastServices = "";
   const names = {
@@ -871,8 +1059,11 @@ function monitorPhantomHEN(entry) {
     }
     if (stage === 13 || stage === 64 || stage >= 0xe0 || polls >= 120) {
       clearInterval(timer);
-      if (stage === 13 || stage === 64)
+      if (stage === 13 || stage === 64) {
         say("PhantomHEN loaded — iDntUseModz");
+        setSetting(11, 1);
+        showSettingsPanel();
+      }
       if ((stage === 13 || stage === 64) && value)
         say("[PhantomHEN] optional startup warnings 0x" + value.toString(16));
     }
