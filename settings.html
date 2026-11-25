@@ -33,6 +33,12 @@ a.back:hover{background:#1a3a4a}
 .tog input:checked+.sl:before{transform:translateX(18px);background:#fff}
 .tog input:disabled+.sl{opacity:.4;cursor:not-allowed}
 footer{text-align:center;padding:30px 0 10px;font-size:11px;color:#444}
+#toast-wrap{position:fixed;bottom:24px;right:20px;display:flex;flex-direction:column-reverse;gap:8px;z-index:9999;pointer-events:none}
+.toast{background:#111;border:1px solid #1a3a4a;color:#e0e0e0;font-size:12px;padding:9px 14px;border-radius:6px;display:flex;align-items:center;gap:8px;min-width:200px;max-width:280px;opacity:0;transform:translateX(20px);transition:opacity .2s,transform .2s}
+.toast.show{opacity:1;transform:translateX(0)}
+.toast .ti{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.toast .ti.on{background:#00c060}
+.toast .ti.off{background:#cc0000}
 </style>
 </head>
 <body>
@@ -49,9 +55,23 @@ footer{text-align:center;padding:30px 0 10px;font-size:11px;color:#444}
 
 <div class="sections" id="sections"></div>
 
+<div id="toast-wrap"></div>
 <footer>PhantomHEN · iDntUseModz · FW 14.02</footer>
 
 <script>
+function showToast(name, on) {
+  var wrap = document.getElementById("toast-wrap");
+  var t = document.createElement("div");
+  t.className = "toast";
+  t.innerHTML = '<span class="ti ' + (on ? "on" : "off") + '"></span>' + name + ': <b>' + (on ? "ON" : "OFF") + '</b>';
+  wrap.appendChild(t);
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){ t.classList.add("show"); }); });
+  setTimeout(function(){
+    t.classList.remove("show");
+    setTimeout(function(){ if (t.parentNode) t.parentNode.removeChild(t); }, 250);
+  }, 2200);
+}
+
 var SYSCALL_NUM = 0xc9;
 var ready = false;
 var stubAt = null;
@@ -201,9 +221,9 @@ function buildUI() {
       inp.id = "st-" + item.id;
       inp.checked = !!(item.def);
       inp.disabled = true;
-      inp.onchange = (function(id) {
-        return function() { callSetting(id, this.checked ? 1 : 0); };
-      })(item.id);
+      inp.onchange = (function(id, name) {
+        return function() { callSetting(id, this.checked ? 1 : 0); showToast(name, this.checked); };
+      })(item.id, item.name);
       var sl = document.createElement("span");
       sl.className = "sl";
       tog.appendChild(inp);
