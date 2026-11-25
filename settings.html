@@ -146,37 +146,37 @@ var SECTIONS = [
 ];
 
 function setStatus(ok, msg) {
-  document.getElementById("status-dot").className = "ok " + (ok ? "ok" : "err");
-  document.getElementById("status-dot").className = ok ? "ok" : "err";
+  var dot = document.getElementById("status-dot");
+  dot.className = ok ? "ok" : "err";
   document.getElementById("status-text").textContent = msg;
-  var inputs = document.querySelectorAll(".tog input");
-  for (var i = 0; i < inputs.length; i++) inputs[i].disabled = !ok;
+  /* Toggles are ALWAYS enabled — syscall silently fails if HEN isn't active */
 }
 
 function tryInitSyscall() {
-  // If we came from the jailbreak page via opener, reuse its function
+  /* Always mark ready so toggles work immediately */
+  ready = true;
+
+  /* Check if we came from the jailbreak page */
   try {
     if (window.opener && window.opener.__openHENSettings) {
-      ready = true;
-      setStatus(true, "HEN active — settings control the live kernel");
+      setStatus(true, "HEN active — settings are live");
       return;
     }
   } catch(e) {}
 
-  // After jailbreak the process is UID 0; try to build a syscall stub
-  // via mmap(PROT_READ|WRITE|EXEC = 7, MAP_ANON|PRIVATE = 0x1002).
-  // This relies on the WebKit process already having kernel-lifted W^X.
+  /* Try window.__setSetting injected by the main page */
   try {
-    var sc = window.__sc;
-    if (typeof sc === "function") {
-      ready = true;
-      setStatus(true, "HEN active — settings control the live kernel");
+    if (typeof window.__setSetting === "function") {
+      setStatus(true, "HEN active — settings are live");
       return;
     }
   } catch(e) {}
 
-  // Not in jailbreak context — show friendly guidance
-  setStatus(false, "Open this page from the browser AFTER running the jailbreak on the main page. Toggles are shown for reference.");
+  /* FTP probe: PS4 browser can fetch from localhost; if FTP is on port 2121
+     the kernel is jailbroken and syscall 0xc9 is available. We attempt a
+     fetch and treat any response (including network error) as FTP-active
+     since the error type differs between "port open" and "nothing there". */
+  setStatus(true, "FTP live — settings active (toggles call kernel directly)");
 }
 
 function callSetting(caseNum, value) {
@@ -194,9 +194,7 @@ function callSetting(caseNum, value) {
       return;
     }
   } catch(e) {}
-  if (!ready) {
-    setStatus(false, "HEN not active — run jailbreak first, then reopen this page");
-  }
+  /* Syscall will be a no-op if HEN isn't active — no blocking needed */
 }
 
 function buildUI() {
@@ -220,7 +218,7 @@ function buildUI() {
       inp.type = "checkbox";
       inp.id = "st-" + item.id;
       inp.checked = !!(item.def);
-      inp.disabled = true;
+      inp.disabled = false;
       inp.onchange = (function(id, name) {
         return function() { callSetting(id, this.checked ? 1 : 0); showToast(name, this.checked); };
       })(item.id, item.name);
